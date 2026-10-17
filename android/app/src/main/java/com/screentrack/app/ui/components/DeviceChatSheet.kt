@@ -20,9 +20,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Forum
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -80,7 +80,7 @@ fun DeviceChatSheet(
     suspend fun fetchMessages(scrollAfter: Boolean = false) {
         val result = supabaseRepo.getDeviceMessages(deviceId)
         if (result.isSuccess) {
-            val list = result.getOrDefault(emptyList())
+            val list = result.getOrDefault(emptyList()).filterNot { it.isExpired24Hours }
             val hadFewer = list.size > messages.size
             messages = list
             if ((scrollAfter || hadFewer) && list.isNotEmpty()) {
@@ -148,7 +148,7 @@ fun DeviceChatSheet(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Paired & Encrypted",
+                                text = "Disappears after 24h • Encrypted",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                             )
@@ -340,7 +340,7 @@ fun DeviceChatSheet(
                             )
                         } else {
                             Icon(
-                                Icons.Default.Send,
+                                Icons.AutoMirrored.Filled.Send,
                                 contentDescription = "Send",
                                 tint = MaterialTheme.colorScheme.onPrimary,
                                 modifier = Modifier.size(20.dp)

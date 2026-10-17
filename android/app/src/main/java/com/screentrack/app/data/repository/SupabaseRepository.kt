@@ -257,9 +257,20 @@ class SupabaseRepository(context: Context) {
             .apply()
     }
 
-    private fun getAccessToken(): String? = prefs.getString("access_token", null)
+    private fun getAccessToken(): String? {
+        val token = prefs.getString("access_token", null) ?: return null
+        val tokenSavedAt = prefs.getLong("token_saved_at", 0L)
+        // If access token is older than 45 minutes, proactively refresh before hitting PostgREST
+        if (System.currentTimeMillis() - tokenSavedAt > 45 * 60 * 1000L) {
+            val refreshed = refreshTokenBlocking()
+            if (refreshed) {
+                return prefs.getString("access_token", null)
+            }
+        }
+        return token
+    }
 
-    private fun clearLocalUser() {
+    fun clearLocalUser() {
         prefs.edit()
             .remove("user_id")
             .remove("user_email")
@@ -270,8 +281,11 @@ class SupabaseRepository(context: Context) {
     }
 
     private fun refreshTokenBlocking(): Boolean {
-        val refresh = prefs.getString("refresh_token", null)
-        if (refresh.isNullOrBlank() || !isConfigured) return false
+        val refresh = prefs.getString("refresh_token", null)?.trim()
+        if (refresh.isNullOrBlank() || !isConfigured) {
+            clearLocalUser()
+            return false
+        }
         return try {
             val payload = buildJsonObject { put("refresh_token", refresh) }
             val responseStr = executeHttpInternal(
@@ -291,9 +305,11 @@ class SupabaseRepository(context: Context) {
                 saveAuthSession(userId, email, newAccess, newRefresh)
                 true
             } else {
+                clearLocalUser()
                 false
             }
         } catch (_: Throwable) {
+            clearLocalUser()
             false
         }
     }
@@ -577,7 +593,12 @@ class SupabaseRepository(context: Context) {
                         )
                     )
                 }
-            } catch (_: Exception) {
+            } catch (rpcEx: Exception) {
+                if (rpcEx.message?.contains("expired", ignoreCase = true) == true ||
+                    rpcEx.message?.contains("sign in", ignoreCase = true) == true
+                ) {
+                    throw rpcEx
+                }
                 // RPC failed or gen_random_bytes not found in DB: seamless fallback
             }
 
@@ -985,26 +1006,29 @@ class SupabaseRepository(context: Context) {
     // -------------------------------------------------------------
 
     /**
-     * Retrieves up to 60 recent messages exchanged between the device owner and authorized viewers.
+     * Retrieves messages exchanged between the device owner and authorized viewers within the last 24 hours.
+     * Older messages automatically disappear after 24 hours to keep database storage lightweight and private.
      */
     suspend fun getDeviceMessages(deviceId: String): Result<List<DeviceChatMessage>> = withContext(Dispatchers.IO) {
         if (!isConfigured || getCurrentSession() == null) return@withContext Result.success(emptyList())
         try {
+            val cutoffMs = System.currentTimeMillis() - (24 * 60 * 60 * 1000L)
+            val cutoffIso = formatIsoTimestamp(cutoffMs)
             val responseStr = executeHttp(
                 method = "GET",
-                endpoint = "/rest/v1/device_messages?device_id=eq.$deviceId&order=created_at.asc&limit=60",
+                endpoint = "/rest/v1/device_messages?device_id=eq.$deviceId&created_at=gte.$cutoffIso&order=created_at.asc&limit=60",
                 body = null,
                 useAuthToken = true
             )
             val list = json.decodeFromString<List<DeviceChatMessage>>(responseStr)
-            Result.success(list)
+            Result.success(list.filterNot { it.isExpired24Hours })
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
     /**
-     * Sends a message associated with a paired device.
+     * Sends a message associated with a paired device and purges any expired messages older than 24 hours.
      */
     suspend fun sendDeviceMessage(
         deviceId: String,
@@ -1017,6 +1041,18 @@ class SupabaseRepository(context: Context) {
         if (trimmed.isEmpty()) return@withContext Result.failure(IllegalArgumentException("Message cannot be empty"))
 
         try {
+            // Proactively purge any expired messages (>24h) for this device to clean storage
+            try {
+                val cutoffIso = formatIsoTimestamp(System.currentTimeMillis() - (24 * 60 * 60 * 1000L))
+                executeHttp(
+                    method = "DELETE",
+                    endpoint = "/rest/v1/device_messages?device_id=eq.$deviceId&created_at=lt.$cutoffIso",
+                    body = null,
+                    useAuthToken = true
+                )
+            } catch (_: Throwable) {
+            }
+
             val body = buildJsonObject {
                 put("device_id", deviceId)
                 put("sender_id", session.userId)
@@ -1065,10 +1101,18 @@ class SupabaseRepository(context: Context) {
         return try {
             executeHttpInternal(method, endpoint, body, token, extraHeaders)
         } catch (e: HttpStatusException) {
-            if (useAuthToken && (e.code == 401 || e.code == 403) && refreshTokenBlocking()) {
+            val isAuthError = e.code == 401 || e.code == 403 ||
+                e.errorBody.contains("jwt", ignoreCase = true) ||
+                e.errorBody.contains("token", ignoreCase = true)
+
+            if (useAuthToken && isAuthError && refreshTokenBlocking()) {
                 val refreshedToken = getAccessToken() ?: supabaseAnonKey
                 executeHttpInternal(method, endpoint, body, refreshedToken, extraHeaders)
             } else {
+                if (isAuthError) {
+                    clearLocalUser()
+                    throw Exception("Login session expired. Please sign in again.")
+                }
                 throw Exception(parseFriendlyErrorMessage(e.errorBody, e.code))
             }
         }
@@ -1126,14 +1170,24 @@ class SupabaseRepository(context: Context) {
     }
 
     private fun parseFriendlyErrorMessage(rawBody: String, statusCode: Int): String {
+        if (rawBody.contains("jwt expired", ignoreCase = true) || rawBody.contains("token is expired", ignoreCase = true)) {
+            clearLocalUser()
+            return "Login session expired. Please sign in again."
+        }
         if (rawBody.isBlank()) return "Server error (HTTP $statusCode)"
         return try {
             val obj = json.parseToJsonElement(rawBody).jsonObject
-            obj["message"]?.jsonPrimitive?.content
+            val msg = obj["message"]?.jsonPrimitive?.content
                 ?: obj["msg"]?.jsonPrimitive?.content
                 ?: obj["error_description"]?.jsonPrimitive?.content
                 ?: obj["error"]?.jsonPrimitive?.content
                 ?: "Request failed (HTTP $statusCode)"
+            if (msg.contains("jwt expired", ignoreCase = true)) {
+                clearLocalUser()
+                "Login session expired. Please sign in again."
+            } else {
+                msg
+            }
         } catch (_: Throwable) {
             rawBody.take(160)
         }

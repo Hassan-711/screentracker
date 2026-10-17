@@ -200,9 +200,9 @@ BEGIN
     WHERE status IN ('approved', 'rejected', 'expired')
       AND requested_at < (timezone('utc'::text, now()) - INTERVAL '7 days');
 
-    -- 6. Delete old paired chat messages (> 7 days)
+    -- 6. Delete paired chat messages older than 24 hours (automatic storage cleanup)
     DELETE FROM public.device_messages
-    WHERE created_at < (timezone('utc'::text, now()) - INTERVAL '7 days');
+    WHERE created_at < (timezone('utc'::text, now()) - INTERVAL '24 hours');
 
     RETURN jsonb_build_object(
         'success', true,
@@ -230,6 +230,26 @@ CREATE TRIGGER trg_auto_cleanup_7_days
     AFTER INSERT ON public.daily_screen_time_summaries
     FOR EACH STATEMENT
     EXECUTE FUNCTION public.trigger_cleanup_old_screen_time_data();
+
+-- Automatic 24-hour cleanup trigger specifically for paired device chat messages
+CREATE OR REPLACE FUNCTION public.trigger_cleanup_24h_device_messages()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+    DELETE FROM public.device_messages
+    WHERE created_at < (timezone('utc'::text, now()) - INTERVAL '24 hours');
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_cleanup_24h_device_messages ON public.device_messages;
+CREATE TRIGGER trg_cleanup_24h_device_messages
+    AFTER INSERT ON public.device_messages
+    FOR EACH STATEMENT
+    EXECUTE FUNCTION public.trigger_cleanup_24h_device_messages();
 
 GRANT EXECUTE ON FUNCTION public.cleanup_old_screen_time_data() TO authenticated;
 
@@ -405,7 +425,10 @@ CREATE POLICY "Authorized viewers can view device sync status"
 DROP POLICY IF EXISTS "Authorized users can view messages for device" ON public.device_messages;
 CREATE POLICY "Authorized users can view messages for device"
     ON public.device_messages FOR SELECT
-    USING (public.is_authorized_viewer(device_id));
+    USING (
+        public.is_authorized_viewer(device_id)
+        AND created_at >= (timezone('utc'::text, now()) - INTERVAL '24 hours')
+    );
 
 DROP POLICY IF EXISTS "Authorized users can insert messages for device" ON public.device_messages;
 CREATE POLICY "Authorized users can insert messages for device"
@@ -414,6 +437,11 @@ CREATE POLICY "Authorized users can insert messages for device"
         auth.uid() = sender_id 
         AND public.is_authorized_viewer(device_id)
     );
+
+DROP POLICY IF EXISTS "Authorized users can delete messages for device" ON public.device_messages;
+CREATE POLICY "Authorized users can delete messages for device"
+    ON public.device_messages FOR DELETE
+    USING (public.is_authorized_viewer(device_id));
 
 -- ==============================================================================
 -- ScreenTrack — Secure Multi-Device Pairing Workflow Stored Functions (RPC)

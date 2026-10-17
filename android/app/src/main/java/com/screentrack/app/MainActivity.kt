@@ -327,7 +327,11 @@ fun ScreenTrackMainApp(
             }
 
             composable(Screen.RemoteSharing.route) {
-                RemoteSharingScreen()
+                RemoteSharingScreen(
+                    onNavigateToAuth = {
+                        navController.navigate(Screen.Auth.route)
+                    }
+                )
             }
 
             composable(Screen.Settings.route) {

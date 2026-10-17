@@ -57,6 +57,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.screentrack.app.data.model.AuthorizedViewer
@@ -71,10 +72,13 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 @Composable
-fun RemoteSharingScreen() {
+fun RemoteSharingScreen(
+    onNavigateToAuth: () -> Unit = {}
+) {
     val context = LocalContext.current
     val supabaseRepo = remember { SupabaseRepository(context) }
     val scope = rememberCoroutineScope()
+    val hasSession = supabaseRepo.getCurrentSession() != null
 
     var deviceName by remember { mutableStateOf(supabaseRepo.getDeviceName()) }
     var showRenameDialog by remember { mutableStateOf(false) }
@@ -149,6 +153,43 @@ fun RemoteSharingScreen() {
 
                 IconButton(onClick = { scope.launch { refreshLists(showSpinner = true) } }) {
                     Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+
+        if (!hasSession) {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.85f)),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Sign In Required",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "You are currently signed out or your login session has expired. Please sign in to generate pairing codes and share screen time.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = { onNavigateToAuth() },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Sign In / Register")
+                        }
+                    }
                 }
             }
         }
@@ -314,12 +355,41 @@ fun RemoteSharingScreen() {
                     }
 
                     if (errorMessage != null) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = errorMessage!!,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall
-                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        val isSessionExpired = errorMessage!!.contains("expired", ignoreCase = true) ||
+                                errorMessage!!.contains("sign in", ignoreCase = true) ||
+                                errorMessage!!.contains("jwt", ignoreCase = true)
+
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.9f)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = errorMessage!!,
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Medium,
+                                    textAlign = TextAlign.Center
+                                )
+                                if (isSessionExpired) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Button(
+                                        onClick = { onNavigateToAuth() },
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text("Sign In Again")
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

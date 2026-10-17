@@ -212,15 +212,25 @@ data class DeviceChatMessage(
             return try {
                 if (createdAt.isBlank()) return ""
                 val clean = createdAt.replace("Z", "+00:00")
-                val format = if (clean.contains(".")) {
-                    SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
-                } else {
-                    SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
-                }
-                val date = format.parse(clean.substringBefore("+").substringBefore(".")) ?: Date()
+                val date = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).parse(clean.substringBefore("+").substringBefore(".")) ?: Date()
                 SimpleDateFormat("hh:mm a", Locale.getDefault()).format(date)
             } catch (_: Exception) {
                 ""
+            }
+        }
+
+    val isExpired24Hours: Boolean
+        get() {
+            return try {
+                if (createdAt.isBlank()) return false
+                val clean = createdAt.replace("Z", "+00:00")
+                val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply {
+                    timeZone = java.util.TimeZone.getTimeZone("UTC")
+                }
+                val date = sdf.parse(clean.substringBefore("+").substringBefore(".")) ?: return false
+                System.currentTimeMillis() - date.time > (24 * 60 * 60 * 1000L)
+            } catch (_: Exception) {
+                false
             }
         }
 }
