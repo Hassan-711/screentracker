@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">ScreenTrack</string>
+    <string name="channel_sync_name">ScreenTrack Sync</string>
+    <string name="channel_sync_description">Notifies user of screen-time synchronization status</string>
+    <string name="channel_monitor_name">ScreenTrack Active Monitor</string>
+    <string name="channel_monitor_description">Active transparent foreground notification for real-time monitoring</string>
+</resources>

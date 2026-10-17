@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Phone Drop Shadow / Outer Glow -->
+    <path
+        android:fillColor="#33000000"
+        android:pathData="M37,28 h34 a8,8 0 0 1 8,8 v42 a8,8 0 0 1 -8,8 h-34 a8,8 0 0 1 -8,-8 v-42 a8,8 0 0 1 8,-8 z" />
+
+    <!-- Smartphone Body Outer Rim -->
+    <path
+        android:fillColor="#1E293B"
+        android:strokeColor="#475569"
+        android:strokeWidth="1.5"
+        android:pathData="M37,26 h34 a7,7 0 0 1 7,7 v42 a7,7 0 0 1 -7,7 h-34 a7,7 0 0 1 -7,-7 v-42 a7,7 0 0 1 7,-7 z" />
+
+    <!-- Screen Display Area -->
+    <path
+        android:fillColor="#090E17"
+        android:strokeColor="#1E293B"
+        android:strokeWidth="0.8"
+        android:pathData="M40,31 h28 a4,4 0 0 1 4,4 v38 a4,4 0 0 1 -4,4 h-28 a4,4 0 0 1 -4,-4 v-38 a4,4 0 0 1 4,-4 z" />
+
+    <!-- Speaker / Earpiece -->
+    <path
+        android:fillColor="#64748B"
+        android:pathData="M51,28.5 h6 a0.75,0.75 0 0 1 0.75,0.75 v0 a0.75,0.75 0 0 1 -0.75,0.75 h-6 a0.75,0.75 0 0 1 -0.75,-0.75 v0 a0.75,0.75 0 0 1 0.75,-0.75 z" />
+
+    <!-- Front Camera Dot -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M46,29.25 a0.75,0.75 0 1 0 1.5,0 a0.75,0.75 0 1 0 -1.5,0" />
+
+    <!-- Screen-Time Gauge / Clock Ring Background Track -->
+    <path
+        android:strokeColor="#1E293B"
+        android:strokeWidth="2.2"
+        android:pathData="M54,46 m-9.5,0 a9.5,9.5 0 1 1 19,0 a9.5,9.5 0 1 1 -19,0" />
+
+    <!-- Active Screen-Time Progress Arc (Cyan to Emerald) -->
+    <path
+        android:strokeColor="#10B981"
+        android:strokeWidth="2.2"
+        android:strokeLineCap="round"
+        android:pathData="M54,36.5 A9.5,9.5 0 1 1 45.8,51.8" />
+
+    <!-- Clock Center Pivot -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M54,46 m-1.2,0 a1.2,1.2 0 1 1 2.4,0 a1.2,1.2 0 1 1 -2.4,0" />
+
+    <!-- Clock Minute Hand (pointing up) -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:pathData="M54,46 L54,40.5" />
+
+    <!-- Clock Hour Hand (pointing toward 2 o'clock) -->
+    <path
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:pathData="M54,46 L57.8,43.2" />
+
+    <!-- Telemetry Daily Analytics Bars below clock -->
+    <!-- Bar 1 (Monday) -->
+    <path
+        android:fillColor="#3B82F6"
+        android:pathData="M43,67 h2.6 a1.3,1.3 0 0 1 1.3,1.3 v3.7 h-3.9 v-3.7 a1.3,1.3 0 0 1 1.3,-1.3 z" />
+
+    <!-- Bar 2 (Tuesday) -->
+    <path
+        android:fillColor="#10B981"
+        android:pathData="M48.5,63 h2.6 a1.3,1.3 0 0 1 1.3,1.3 v7.7 h-3.9 v-7.7 a1.3,1.3 0 0 1 1.3,-1.3 z" />
+
+    <!-- Bar 3 (Wednesday) -->
+    <path
+        android:fillColor="#F59E0B"
+        android:pathData="M54,65 h2.6 a1.3,1.3 0 0 1 1.3,1.3 v5.7 h-3.9 v-5.7 a1.3,1.3 0 0 1 1.3,-1.3 z" />
+
+    <!-- Bar 4 (Thursday / Today peak) -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M59.5,60.5 h2.6 a1.3,1.3 0 0 1 1.3,1.3 v10.2 h-3.9 v-10.2 a1.3,1.3 0 0 1 1.3,-1.3 z" />
+
+    <!-- Home Navigation Bar Indicator -->
+    <path
+        android:fillColor="#475569"
+        android:pathData="M50.5,77.5 h7 a0.6,0.6 0 0 1 0.6,0.6 v0 a0.6,0.6 0 0 1 -0.6,0.6 h-7 a0.6,0.6 0 0 1 -0.6,-0.6 v0 a0.6,0.6 0 0 1 0.6,-0.6 z" />
+
+</vector>
