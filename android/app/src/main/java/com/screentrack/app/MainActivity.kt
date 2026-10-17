@@ -71,6 +71,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        // Conserve memory & storage: Clean up any downloaded update APKs from internal cache
+        com.screentrack.app.util.AppUpdateManager.cleanupDownloadedApks(this)
+
         usageRepo = UsageStatsRepository(this)
         supabaseRepo = SupabaseRepository(this)
 
@@ -92,14 +95,21 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            ScreenTrackTheme {
+            var currentThemeMode by remember { mutableStateOf(supabaseRepo.getThemeMode()) }
+
+            ScreenTrackTheme(themeMode = currentThemeMode) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
                     ScreenTrackMainApp(
                         usageRepo = usageRepo,
-                        supabaseRepo = supabaseRepo
+                        supabaseRepo = supabaseRepo,
+                        currentThemeMode = currentThemeMode,
+                        onThemeModeChanged = { newMode ->
+                            supabaseRepo.setThemeMode(newMode)
+                            currentThemeMode = newMode
+                        }
                     )
                 }
             }
@@ -162,7 +172,9 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun ScreenTrackMainApp(
     usageRepo: UsageStatsRepository,
-    supabaseRepo: SupabaseRepository
+    supabaseRepo: SupabaseRepository,
+    currentThemeMode: String = "clay_light",
+    onThemeModeChanged: (String) -> Unit = {}
 ) {
     val navController = rememberNavController()
     var permissionState by remember { mutableStateOf(usageRepo.checkPermissionState()) }
@@ -320,6 +332,8 @@ fun ScreenTrackMainApp(
 
             composable(Screen.Settings.route) {
                 SettingsScreen(
+                    currentThemeMode = currentThemeMode,
+                    onThemeModeChanged = onThemeModeChanged,
                     onNavigateToAuth = {
                         navController.navigate(Screen.Auth.route)
                     },

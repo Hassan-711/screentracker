@@ -196,3 +196,31 @@ data class UserSession(
     val email: String,
     val isAuthenticated: Boolean
 )
+
+@Serializable
+data class DeviceChatMessage(
+    val id: String = "",
+    @SerialName("device_id") val deviceId: String,
+    @SerialName("sender_id") val senderId: String,
+    @SerialName("sender_email") val senderEmail: String = "",
+    @SerialName("sender_role") val senderRole: String = "viewer", // "owner" or "viewer"
+    @SerialName("message_text") val messageText: String,
+    @SerialName("created_at") val createdAt: String = ""
+) {
+    val formattedTime: String
+        get() {
+            return try {
+                if (createdAt.isBlank()) return ""
+                val clean = createdAt.replace("Z", "+00:00")
+                val format = if (clean.contains(".")) {
+                    SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+                } else {
+                    SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+                }
+                val date = format.parse(clean.substringBefore("+").substringBefore(".")) ?: Date()
+                SimpleDateFormat("hh:mm a", Locale.getDefault()).format(date)
+            } catch (_: Exception) {
+                ""
+            }
+        }
+}

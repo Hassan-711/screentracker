@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.AddLink
 import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Devices
+import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.PhoneAndroid
@@ -67,6 +68,7 @@ import com.screentrack.app.data.model.DailyAnalyticsPoint
 import com.screentrack.app.data.model.RemoteDeviceLiveState
 import com.screentrack.app.data.model.SharingRequest
 import com.screentrack.app.data.repository.SupabaseRepository
+import com.screentrack.app.ui.components.DeviceChatSheet
 import com.screentrack.app.ui.theme.AccentAmber
 import com.screentrack.app.ui.theme.AccentEmerald
 import com.screentrack.app.ui.theme.AccentRose
@@ -101,6 +103,7 @@ fun RemoteMonitorScreen(
 
     var deviceToRemove by remember { mutableStateOf<com.screentrack.app.data.model.RegisteredDevice?>(null) }
     var isRemovingDevice by remember { mutableStateOf(false) }
+    var chatTargetDevice by remember { mutableStateOf<com.screentrack.app.data.model.RegisteredDevice?>(null) }
 
     suspend fun loadRemoteData(showSpinner: Boolean = false) {
         if (!supabaseRepo.isConfigured || supabaseRepo.getCurrentSession() == null) {
@@ -522,6 +525,19 @@ fun RemoteMonitorScreen(
                                     }
 
                                     IconButton(
+                                        onClick = { chatTargetDevice = dev },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Forum,
+                                            contentDescription = "Chat with Phone",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(4.dp))
+
+                                    IconButton(
                                         onClick = { deviceToRemove = dev },
                                         modifier = Modifier.size(36.dp)
                                     ) {
@@ -932,6 +948,15 @@ fun RemoteMonitorScreen(
                     Text("Cancel")
                 }
             }
+        )
+    }
+
+    if (chatTargetDevice != null) {
+        DeviceChatSheet(
+            deviceId = chatTargetDevice!!.id,
+            deviceOrViewerName = chatTargetDevice!!.deviceName,
+            isOwner = false,
+            onDismiss = { chatTargetDevice = null }
         )
     }
 }

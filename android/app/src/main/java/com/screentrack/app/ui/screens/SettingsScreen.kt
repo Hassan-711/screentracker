@@ -20,15 +20,20 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoDelete
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Login
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -38,11 +43,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import java.io.File
+import com.screentrack.app.BuildConfig
+import com.screentrack.app.util.AppUpdateInfo
+import com.screentrack.app.util.AppUpdateManager
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -59,6 +69,8 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(
+    currentThemeMode: String = "clay_light",
+    onThemeModeChanged: (String) -> Unit = {},
     onNavigateToAuth: () -> Unit,
     onLogout: () -> Unit
 ) {
@@ -72,6 +84,15 @@ fun SettingsScreen(
 
     var syncIntervalMinutes by remember { mutableIntStateOf(supabaseRepo.getSyncIntervalMinutes()) }
     var isForegroundServiceEnabled by remember { mutableStateOf(supabaseRepo.isForegroundMonitorEnabled()) }
+
+    // App Update State (Solution 1 - GitHub In-App Auto-Updater)
+    var isCheckingUpdate by remember { mutableStateOf(false) }
+    var updateInfo by remember { mutableStateOf<AppUpdateInfo?>(null) }
+    var updateCheckDone by remember { mutableStateOf(false) }
+    var updateError by remember { mutableStateOf<String?>(null) }
+    var isDownloadingUpdate by remember { mutableStateOf(false) }
+    var downloadProgress by remember { mutableFloatStateOf(0f) }
+    var downloadedApkFile by remember { mutableStateOf<File?>(null) }
 
     LazyColumn(
         modifier = Modifier
@@ -343,6 +364,227 @@ fun SettingsScreen(
                         shape = RoundedCornerShape(10.dp)
                     ) {
                         Text("Run >7-Day Cleanup Now")
+                    }
+                }
+            }
+        }
+
+        // Theme Appearance Card (Claymorphic Styling)
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Palette, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = "App Theme & Appearance", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Choose your preferred aesthetic. Warm Clay Cream provides the signature claymorphic look across all phones.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    val themeOptions = listOf(
+                        "clay_light" to "Warm Clay Cream (Signature Claymorphism)",
+                        "clay_dark" to "Dark Ceramic Clay (Warm Slate & Terracotta)",
+                        "system" to "System Auto"
+                    )
+
+                    themeOptions.forEach { (mode, label) ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp)
+                        ) {
+                            RadioButton(
+                                selected = currentThemeMode == mode,
+                                onClick = { onThemeModeChanged(mode) }
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(text = label, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+            }
+        }
+
+        // In-App Auto-Updater Card (GitHub Releases - Solution 1)
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = "In-App Updates", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                        }
+                        Text(
+                            text = "v${BuildConfig.VERSION_NAME}",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Automatically checks GitHub for latest release APKs. Downloaded APKs are cleaned up post-install to conserve storage.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    if (updateInfo != null) {
+                        val update = updateInfo!!
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(AccentEmerald.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
+                                .padding(12.dp)
+                        ) {
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Download, contentDescription = null, tint = AccentEmerald, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Update Available: v${update.versionName}",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = AccentEmerald
+                                    )
+                                }
+                                if (update.releaseNotes.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = update.releaseNotes.take(120),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        if (isDownloadingUpdate) {
+                            Column {
+                                LinearProgressIndicator(
+                                    progress = { downloadProgress },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Downloading update: ${(downloadProgress * 100).toInt()}%",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        } else if (downloadedApkFile != null && downloadedApkFile!!.exists()) {
+                            Button(
+                                onClick = {
+                                    if (!AppUpdateManager.canInstallApk(context)) {
+                                        Toast.makeText(context, "Please allow unknown app installation to proceed", Toast.LENGTH_LONG).show()
+                                        AppUpdateManager.openInstallPermissionSettings(context)
+                                    } else {
+                                        AppUpdateManager.installApk(context, downloadedApkFile!!)
+                                    }
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Install Update Now")
+                            }
+                        } else {
+                            Button(
+                                onClick = {
+                                    if (!AppUpdateManager.canInstallApk(context)) {
+                                        Toast.makeText(context, "Please allow unknown app installation first", Toast.LENGTH_SHORT).show()
+                                        AppUpdateManager.openInstallPermissionSettings(context)
+                                    }
+                                    isDownloadingUpdate = true
+                                    scope.launch {
+                                        val res = AppUpdateManager.downloadApk(context, update.apkDownloadUrl) { progress ->
+                                            downloadProgress = progress
+                                        }
+                                        isDownloadingUpdate = false
+                                        if (res.isSuccess) {
+                                            downloadedApkFile = res.getOrNull()
+                                            Toast.makeText(context, "Update downloaded! Ready to install.", Toast.LENGTH_SHORT).show()
+                                            downloadedApkFile?.let { AppUpdateManager.installApk(context, it) }
+                                        } else {
+                                            updateError = res.exceptionOrNull()?.localizedMessage ?: "Download failed"
+                                        }
+                                    }
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Download & Install Update")
+                            }
+                        }
+                    } else if (updateCheckDone && !isCheckingUpdate) {
+                        Text(
+                            text = "You are currently running the latest version.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AccentEmerald,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    if (updateError != null) {
+                        Text(
+                            text = updateError!!,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AccentRose
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            isCheckingUpdate = true
+                            updateError = null
+                            scope.launch {
+                                val res = AppUpdateManager.checkForUpdate(BuildConfig.VERSION_NAME)
+                                isCheckingUpdate = false
+                                updateCheckDone = true
+                                if (res.isSuccess) {
+                                    updateInfo = res.getOrNull()
+                                    if (updateInfo == null) {
+                                        Toast.makeText(context, "App is up to date!", Toast.LENGTH_SHORT).show()
+                                    }
+                                } else {
+                                    updateError = res.exceptionOrNull()?.localizedMessage
+                                }
+                            }
+                        },
+                        enabled = !isCheckingUpdate && !isDownloadingUpdate,
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        if (isCheckingUpdate) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Checking GitHub...")
+                        } else {
+                            Text("Check for Updates")
+                        }
                     }
                 }
             }

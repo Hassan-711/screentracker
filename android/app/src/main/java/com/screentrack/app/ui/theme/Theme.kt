@@ -28,18 +28,17 @@ private val LightColorScheme = lightColorScheme(
 
 @Composable
 fun ScreenTrackTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = false, // Default to custom softer clay palette
+    themeMode: String = "clay_light",
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
+    val systemDark = isSystemInDarkTheme()
+    val isDark = when (themeMode) {
+        "clay_dark" -> true
+        "system" -> systemDark
+        else -> false // "clay_light" -> Signature Warm Cream Claymorphism
     }
+
+    val colorScheme = if (isDark) DarkColorScheme else LightColorScheme
 
     MaterialTheme(
         colorScheme = colorScheme,

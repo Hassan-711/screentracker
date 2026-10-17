@@ -146,6 +146,19 @@ CREATE TABLE IF NOT EXISTS public.device_sync_status (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
 
+CREATE TABLE IF NOT EXISTS public.device_messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    device_id UUID NOT NULL REFERENCES public.registered_devices(id) ON DELETE CASCADE,
+    sender_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    sender_email TEXT NOT NULL DEFAULT '',
+    sender_role TEXT NOT NULL DEFAULT 'viewer',
+    message_text TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+CREATE INDEX IF NOT EXISTS idx_device_messages_device_created 
+ON public.device_messages(device_id, created_at DESC);
+
 -- ==============================================================================
 -- AUTOMATIC 7-DAY HISTORY RETENTION & CLEANUP
 -- Automatically purges usage history older than 7 days to keep DB lightweight
@@ -186,6 +199,10 @@ BEGIN
     DELETE FROM public.device_sharing_requests
     WHERE status IN ('approved', 'rejected', 'expired')
       AND requested_at < (timezone('utc'::text, now()) - INTERVAL '7 days');
+
+    -- 6. Delete old paired chat messages (> 7 days)
+    DELETE FROM public.device_messages
+    WHERE created_at < (timezone('utc'::text, now()) - INTERVAL '7 days');
 
     RETURN jsonb_build_object(
         'success', true,
@@ -229,6 +246,7 @@ ALTER TABLE public.authorized_device_viewers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.daily_screen_time_summaries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.app_usage_summaries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.device_sync_status ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.device_messages ENABLE ROW LEVEL SECURITY;
 
 -- Helper function to check if auth.uid() is an active authorized viewer OR owner for a device
 CREATE OR REPLACE FUNCTION public.is_authorized_viewer(p_device_id UUID)
@@ -382,6 +400,20 @@ DROP POLICY IF EXISTS "Authorized viewers can view device sync status" ON public
 CREATE POLICY "Authorized viewers can view device sync status"
     ON public.device_sync_status FOR SELECT
     USING (public.is_authorized_viewer(device_id));
+
+-- 10. DEVICE MESSAGES POLICIES
+DROP POLICY IF EXISTS "Authorized users can view messages for device" ON public.device_messages;
+CREATE POLICY "Authorized users can view messages for device"
+    ON public.device_messages FOR SELECT
+    USING (public.is_authorized_viewer(device_id));
+
+DROP POLICY IF EXISTS "Authorized users can insert messages for device" ON public.device_messages;
+CREATE POLICY "Authorized users can insert messages for device"
+    ON public.device_messages FOR INSERT
+    WITH CHECK (
+        auth.uid() = sender_id 
+        AND public.is_authorized_viewer(device_id)
+    );
 
 -- ==============================================================================
 -- ScreenTrack — Secure Multi-Device Pairing Workflow Stored Functions (RPC)

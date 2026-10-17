@@ -15,6 +15,7 @@ import com.screentrack.app.data.model.RemoteDeviceLiveState
 import com.screentrack.app.data.model.ScreenTimeSummary
 import com.screentrack.app.data.model.SharingRequest
 import com.screentrack.app.data.model.UserSession
+import com.screentrack.app.data.model.DeviceChatMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -977,6 +978,76 @@ class SupabaseRepository(context: Context) {
         } catch (_: Throwable) {
             Pair(false, "Synced")
         }
+    }
+
+    // -------------------------------------------------------------
+    // Inter-Device Messaging (Person A & Person B Chat)
+    // -------------------------------------------------------------
+
+    /**
+     * Retrieves up to 60 recent messages exchanged between the device owner and authorized viewers.
+     */
+    suspend fun getDeviceMessages(deviceId: String): Result<List<DeviceChatMessage>> = withContext(Dispatchers.IO) {
+        if (!isConfigured || getCurrentSession() == null) return@withContext Result.success(emptyList())
+        try {
+            val responseStr = executeHttp(
+                method = "GET",
+                endpoint = "/rest/v1/device_messages?device_id=eq.$deviceId&order=created_at.asc&limit=60",
+                body = null,
+                useAuthToken = true
+            )
+            val list = json.decodeFromString<List<DeviceChatMessage>>(responseStr)
+            Result.success(list)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Sends a message associated with a paired device.
+     */
+    suspend fun sendDeviceMessage(
+        deviceId: String,
+        messageText: String,
+        senderRole: String = "viewer"
+    ): Result<DeviceChatMessage> = withContext(Dispatchers.IO) {
+        val session = getCurrentSession() ?: return@withContext Result.failure(IllegalStateException("Not authenticated"))
+        if (!isConfigured) return@withContext Result.failure(IllegalStateException("Backend not configured"))
+        val trimmed = messageText.trim()
+        if (trimmed.isEmpty()) return@withContext Result.failure(IllegalArgumentException("Message cannot be empty"))
+
+        try {
+            val body = buildJsonObject {
+                put("device_id", deviceId)
+                put("sender_id", session.userId)
+                put("sender_email", session.email)
+                put("sender_role", senderRole)
+                put("message_text", trimmed)
+            }.toString()
+
+            val responseStr = executeHttp(
+                method = "POST",
+                endpoint = "/rest/v1/device_messages",
+                body = body,
+                useAuthToken = true,
+                extraHeaders = mapOf("Prefer" to "return=representation")
+            )
+            val list = json.decodeFromString<List<DeviceChatMessage>>(responseStr)
+            val msg = list.firstOrNull() ?: throw Exception("Failed to send message")
+            Result.success(msg)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // -------------------------------------------------------------
+    // App Theme Preference
+    // -------------------------------------------------------------
+
+    fun getThemeMode(): String = prefs.getString("app_theme_mode", "clay_light") ?: "clay_light"
+
+    fun setThemeMode(mode: String) {
+        prefs.edit().putString("app_theme_mode", mode).apply()
     }
 
     // -------------------------------------------------------------

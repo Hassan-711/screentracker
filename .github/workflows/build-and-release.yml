@@ -1,0 +1,67 @@
+name: Build and Publish Release APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release Tag (e.g. v2.0.1)'
+        required: true
+        default: 'v2.0.1'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build & Release Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x android/gradlew
+
+      - name: Build Release APK
+        run: |
+          cd android
+          ./gradlew assembleRelease --stacktrace
+
+      - name: Prepare Release APK Artifact
+        id: prepare_apk
+        run: |
+          TAG="${{ github.ref_name }}"
+          if [ -z "$TAG" ] || [ "$TAG" = "main" ]; then
+            TAG="${{ github.event.inputs.tag_name }}"
+          fi
+          if [ -z "$TAG" ]; then
+            TAG="v2.0.0"
+          fi
+          APK_PATH="android/app/build/outputs/apk/release/app-release.apk"
+          OUT_APK="screentrack-${TAG}.apk"
+          cp "$APK_PATH" "$OUT_APK"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "apk_file=$OUT_APK" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release and Upload APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.prepare_apk.outputs.tag }}
+          name: "ScreenTrack ${{ steps.prepare_apk.outputs.tag }}"
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: ${{ steps.prepare_apk.outputs.apk_file }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

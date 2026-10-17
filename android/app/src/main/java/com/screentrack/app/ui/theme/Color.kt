@@ -34,10 +34,14 @@ val PastelAmberText = Color(0xFF845D25)
 val PastelLavender = Color(0xFFEBE4F4)
 val PastelLavenderText = Color(0xFF634B82)
 
-// Dark Theme counterparts
-val ClayBackgroundDark = Color(0xFF12161F)
-val ClaySurfaceDark = Color(0xFF1E2433)
-val ClayCardBorderDark = Color(0xFF2E364A)
-val ClayPrimaryDark = Color(0xFF60A5FA)
-val ClaySecondaryDark = Color(0xFF34D399)
-val ClayTertiaryDark = Color(0xFFFBBF24)
+// Dark Clay Theme Counterparts (Warm Ceramic Clay - Zero neon blue)
+val ClayBackgroundDark = Color(0xFF181614)       // Rich warm charcoal slate
+val ClaySurfaceDark = Color(0xFF24211D)          // Matte warm clay ceramic
+val ClaySurfaceElevatedDark = Color(0xFF2D2A25)
+val ClayCardBorderDark = Color(0xFF38332D)
+
+val ClayPrimaryDark = Color(0xFFD48166)          // Warm Terracotta Clay
+val ClaySecondaryDark = Color(0xFF6B9E83)        // Muted Sage Green
+val ClayTertiaryDark = Color(0xFFD9A05B)         // Warm Amber Clay
+val ClayTextPrimaryDark = Color(0xFFEDE6DE)
+val ClayTextSecondaryDark = Color(0xFFA89F93)

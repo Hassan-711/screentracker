@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhoneAndroid
@@ -62,6 +63,7 @@ import com.screentrack.app.data.model.AuthorizedViewer
 import com.screentrack.app.data.model.PairingCodeResult
 import com.screentrack.app.data.model.SharingRequest
 import com.screentrack.app.data.repository.SupabaseRepository
+import com.screentrack.app.ui.components.DeviceChatSheet
 import com.screentrack.app.ui.theme.AccentEmerald
 import com.screentrack.app.ui.theme.AccentRose
 import kotlinx.coroutines.delay
@@ -87,6 +89,7 @@ fun RemoteSharingScreen() {
     var isLoadingLists by remember { mutableStateOf(true) }
 
     var viewerToRevoke by remember { mutableStateOf<AuthorizedViewer?>(null) }
+    var activeChatTarget by remember { mutableStateOf<Pair<String, String>?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     suspend fun refreshLists(showSpinner: Boolean = false) {
@@ -467,12 +470,28 @@ fun RemoteSharingScreen() {
                             }
                         }
 
-                        OutlinedButton(
-                            onClick = { viewerToRevoke = viewer },
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentRose),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text("Revoke", fontSize = 12.sp)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Button(
+                                onClick = {
+                                    activeChatTarget = Pair(viewer.deviceId, viewer.viewerEmail)
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.Default.Forum, contentDescription = "Chat", modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Chat", fontSize = 12.sp)
+                            }
+
+                            Spacer(modifier = Modifier.width(6.dp))
+
+                            OutlinedButton(
+                                onClick = { viewerToRevoke = viewer },
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentRose),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("Revoke", fontSize = 12.sp)
+                            }
                         }
                     }
                 }
@@ -556,6 +575,15 @@ fun RemoteSharingScreen() {
                     Text("Cancel")
                 }
             }
+        )
+    }
+
+    if (activeChatTarget != null) {
+        DeviceChatSheet(
+            deviceId = activeChatTarget!!.first,
+            deviceOrViewerName = activeChatTarget!!.second,
+            isOwner = true,
+            onDismiss = { activeChatTarget = null }
         )
     }
 }

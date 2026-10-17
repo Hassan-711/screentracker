@@ -11,6 +11,7 @@ class ScreenTrackApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         try {
+            com.screentrack.app.util.AppUpdateManager.cleanupDownloadedApks(this)
             createNotificationChannels()
             scheduleBackgroundSync()
         } catch (_: Throwable) {

@@ -37,6 +37,7 @@ android/.idea/
 # Keystore files
 *.jks
 *.keystore
+!android/app/screentrack.jks
 
 # External native build folder
 .externalNativeBuild
