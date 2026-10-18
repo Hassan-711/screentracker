@@ -36,10 +36,12 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.screentrack.app.data.repository.PermissionState
 import com.screentrack.app.data.repository.SupabaseRepository
 import com.screentrack.app.data.repository.UsageStatsRepository
@@ -48,6 +50,7 @@ import com.screentrack.app.ui.navigation.Screen
 import com.screentrack.app.ui.screens.AnalyticsScreen
 import com.screentrack.app.ui.screens.AppUsageScreen
 import com.screentrack.app.ui.screens.AuthScreen
+import com.screentrack.app.ui.screens.ChatScreen
 import com.screentrack.app.ui.screens.DashboardScreen
 import com.screentrack.app.ui.screens.OnboardingScreen
 import com.screentrack.app.ui.screens.RemoteMonitorScreen
@@ -314,6 +317,9 @@ fun ScreenTrackMainApp(
                     },
                     onNavigateToSettings = {
                         navController.navigate(Screen.Settings.route)
+                    },
+                    onNavigateToChat = { deviceId, partnerId, partnerEmail, title ->
+                        navController.navigate(Screen.Chat.createRoute(deviceId, partnerId, partnerEmail, title))
                     }
                 )
             }
@@ -330,7 +336,33 @@ fun ScreenTrackMainApp(
                 RemoteSharingScreen(
                     onNavigateToAuth = {
                         navController.navigate(Screen.Auth.route)
+                    },
+                    onNavigateToChat = { deviceId, partnerId, partnerEmail, title ->
+                        navController.navigate(Screen.Chat.createRoute(deviceId, partnerId, partnerEmail, title))
                     }
+                )
+            }
+
+            composable(
+                route = Screen.Chat.route,
+                arguments = listOf(
+                    navArgument("deviceId") { type = NavType.StringType },
+                    navArgument("partnerId") { type = NavType.StringType },
+                    navArgument("partnerEmail") { type = NavType.StringType },
+                    navArgument("title") { type = NavType.StringType }
+                )
+            ) { backStackEntry ->
+                val deviceId = backStackEntry.arguments?.getString("deviceId") ?: ""
+                val partnerId = backStackEntry.arguments?.getString("partnerId") ?: ""
+                val partnerEmail = backStackEntry.arguments?.getString("partnerEmail") ?: ""
+                val title = backStackEntry.arguments?.getString("title") ?: ""
+
+                ChatScreen(
+                    deviceId = if (deviceId == "none") "" else deviceId,
+                    partnerId = if (partnerId == "none") "" else partnerId,
+                    partnerEmail = if (partnerEmail == "none") "" else partnerEmail,
+                    title = if (title == "none") "Chat" else title,
+                    onNavigateBack = { navController.popBackStack() }
                 )
             }
 

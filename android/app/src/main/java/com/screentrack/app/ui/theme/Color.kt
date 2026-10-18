@@ -12,9 +12,9 @@ val ClayTextPrimary = Color(0xFF2B251F)
 val ClayTextSecondary = Color(0xFF71675A)
 val ClayTextMuted = Color(0xFF8C8274)
 
-val ClayPrimary = Color(0xFF3B6E9C)       // Crisp Slate Blue
-val ClaySecondary = Color(0xFF4C8B71)     // Balanced Sage Green
-val ClayTertiary = Color(0xFF9D6453)      // Warm Terracotta
+val ClayPrimary = Color(0xFFC26D4D)       // Warm Terracotta Ceramic Clay (Signature Claymorphic)
+val ClaySecondary = Color(0xFF53846B)     // Balanced Sage Green Clay
+val ClayTertiary = Color(0xFFC78B3F)      // Warm Caramel Amber Clay
 
 // Status & Semantic Accent Colors (Previously missing, causing compile/runtime issues)
 val AccentEmerald = Color(0xFF10B981)

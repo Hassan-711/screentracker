@@ -241,8 +241,7 @@ class SupabaseRepository(context: Context) {
 
     fun getCurrentSession(): UserSession? {
         val uid = prefs.getString("user_id", null) ?: return null
-        val token = prefs.getString("access_token", null)
-        if (uid.isBlank() || token.isNullOrBlank()) return null
+        if (uid.isBlank()) return null
         val email = prefs.getString("user_email", "") ?: ""
         return UserSession(uid, email, true)
     }
@@ -283,7 +282,6 @@ class SupabaseRepository(context: Context) {
     private fun refreshTokenBlocking(): Boolean {
         val refresh = prefs.getString("refresh_token", null)?.trim()
         if (refresh.isNullOrBlank() || !isConfigured) {
-            clearLocalUser()
             return false
         }
         return try {
@@ -305,11 +303,10 @@ class SupabaseRepository(context: Context) {
                 saveAuthSession(userId, email, newAccess, newRefresh)
                 true
             } else {
-                clearLocalUser()
                 false
             }
         } catch (_: Throwable) {
-            clearLocalUser()
+            // Never wipe credentials on transient network failure or timeout!
             false
         }
     }
@@ -1006,17 +1003,32 @@ class SupabaseRepository(context: Context) {
     // -------------------------------------------------------------
 
     /**
-     * Retrieves messages exchanged between the device owner and authorized viewers within the last 24 hours.
+     * Retrieves messages exchanged in a conversation within the last 24 hours.
      * Older messages automatically disappear after 24 hours to keep database storage lightweight and private.
+     * Supports both inter-account conversation keys and legacy device_id filtering.
      */
-    suspend fun getDeviceMessages(deviceId: String): Result<List<DeviceChatMessage>> = withContext(Dispatchers.IO) {
+    suspend fun getConversationMessages(
+        conversationKey: String,
+        deviceId: String? = null
+    ): Result<List<DeviceChatMessage>> = withContext(Dispatchers.IO) {
         if (!isConfigured || getCurrentSession() == null) return@withContext Result.success(emptyList())
         try {
             val cutoffMs = System.currentTimeMillis() - (24 * 60 * 60 * 1000L)
             val cutoffIso = formatIsoTimestamp(cutoffMs)
+
+            val queryFilter = if (conversationKey.isNotBlank() && !deviceId.isNullOrBlank()) {
+                "or=(conversation_key.eq.$conversationKey,device_id.eq.$deviceId)"
+            } else if (conversationKey.isNotBlank()) {
+                "conversation_key=eq.$conversationKey"
+            } else if (!deviceId.isNullOrBlank()) {
+                "device_id=eq.$deviceId"
+            } else {
+                return@withContext Result.success(emptyList())
+            }
+
             val responseStr = executeHttp(
                 method = "GET",
-                endpoint = "/rest/v1/device_messages?device_id=eq.$deviceId&created_at=gte.$cutoffIso&order=created_at.asc&limit=60",
+                endpoint = "/rest/v1/device_messages?$queryFilter&created_at=gte.$cutoffIso&order=created_at.asc&limit=100",
                 body = null,
                 useAuthToken = true
             )
@@ -1027,11 +1039,18 @@ class SupabaseRepository(context: Context) {
         }
     }
 
+    suspend fun getDeviceMessages(deviceId: String): Result<List<DeviceChatMessage>> {
+        return getConversationMessages(conversationKey = "", deviceId = deviceId)
+    }
+
     /**
-     * Sends a message associated with a paired device and purges any expired messages older than 24 hours.
+     * Sends a message between accounts/devices and purges any expired messages older than 24 hours.
      */
-    suspend fun sendDeviceMessage(
-        deviceId: String,
+    suspend fun sendConversationMessage(
+        conversationKey: String,
+        recipientId: String? = null,
+        recipientEmail: String? = null,
+        deviceId: String? = null,
         messageText: String,
         senderRole: String = "viewer"
     ): Result<DeviceChatMessage> = withContext(Dispatchers.IO) {
@@ -1041,12 +1060,12 @@ class SupabaseRepository(context: Context) {
         if (trimmed.isEmpty()) return@withContext Result.failure(IllegalArgumentException("Message cannot be empty"))
 
         try {
-            // Proactively purge any expired messages (>24h) for this device to clean storage
+            // Proactively purge any expired messages (>24h) to clean storage
             try {
                 val cutoffIso = formatIsoTimestamp(System.currentTimeMillis() - (24 * 60 * 60 * 1000L))
                 executeHttp(
                     method = "DELETE",
-                    endpoint = "/rest/v1/device_messages?device_id=eq.$deviceId&created_at=lt.$cutoffIso",
+                    endpoint = "/rest/v1/device_messages?created_at=lt.$cutoffIso",
                     body = null,
                     useAuthToken = true
                 )
@@ -1054,10 +1073,21 @@ class SupabaseRepository(context: Context) {
             }
 
             val body = buildJsonObject {
-                put("device_id", deviceId)
+                if (!deviceId.isNullOrBlank()) {
+                    put("device_id", deviceId)
+                }
                 put("sender_id", session.userId)
                 put("sender_email", session.email)
                 put("sender_role", senderRole)
+                if (!recipientId.isNullOrBlank()) {
+                    put("recipient_id", recipientId)
+                }
+                if (!recipientEmail.isNullOrBlank()) {
+                    put("recipient_email", recipientEmail)
+                }
+                if (conversationKey.isNotBlank()) {
+                    put("conversation_key", conversationKey)
+                }
                 put("message_text", trimmed)
             }.toString()
 
@@ -1074,6 +1104,21 @@ class SupabaseRepository(context: Context) {
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    suspend fun sendDeviceMessage(
+        deviceId: String,
+        messageText: String,
+        senderRole: String = "viewer"
+    ): Result<DeviceChatMessage> {
+        return sendConversationMessage(
+            conversationKey = "",
+            recipientId = null,
+            recipientEmail = null,
+            deviceId = deviceId,
+            messageText = messageText,
+            senderRole = senderRole
+        )
     }
 
     // -------------------------------------------------------------
@@ -1109,10 +1154,6 @@ class SupabaseRepository(context: Context) {
                 val refreshedToken = getAccessToken() ?: supabaseAnonKey
                 executeHttpInternal(method, endpoint, body, refreshedToken, extraHeaders)
             } else {
-                if (isAuthError) {
-                    clearLocalUser()
-                    throw Exception("Login session expired. Please sign in again.")
-                }
                 throw Exception(parseFriendlyErrorMessage(e.errorBody, e.code))
             }
         }
@@ -1171,8 +1212,7 @@ class SupabaseRepository(context: Context) {
 
     private fun parseFriendlyErrorMessage(rawBody: String, statusCode: Int): String {
         if (rawBody.contains("jwt expired", ignoreCase = true) || rawBody.contains("token is expired", ignoreCase = true)) {
-            clearLocalUser()
-            return "Login session expired. Please sign in again."
+            return "Connection or authentication refreshed. Please try again."
         }
         if (rawBody.isBlank()) return "Server error (HTTP $statusCode)"
         return try {
@@ -1182,12 +1222,7 @@ class SupabaseRepository(context: Context) {
                 ?: obj["error_description"]?.jsonPrimitive?.content
                 ?: obj["error"]?.jsonPrimitive?.content
                 ?: "Request failed (HTTP $statusCode)"
-            if (msg.contains("jwt expired", ignoreCase = true)) {
-                clearLocalUser()
-                "Login session expired. Please sign in again."
-            } else {
-                msg
-            }
+            msg
         } catch (_: Throwable) {
             rawBody.take(160)
         }

@@ -148,16 +148,27 @@ CREATE TABLE IF NOT EXISTS public.device_sync_status (
 
 CREATE TABLE IF NOT EXISTS public.device_messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    device_id UUID NOT NULL REFERENCES public.registered_devices(id) ON DELETE CASCADE,
+    device_id UUID REFERENCES public.registered_devices(id) ON DELETE SET NULL,
     sender_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     sender_email TEXT NOT NULL DEFAULT '',
     sender_role TEXT NOT NULL DEFAULT 'viewer',
+    recipient_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    recipient_email TEXT NOT NULL DEFAULT '',
+    conversation_key TEXT NOT NULL DEFAULT '',
     message_text TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
 
+ALTER TABLE public.device_messages ALTER COLUMN device_id DROP NOT NULL;
+ALTER TABLE public.device_messages ADD COLUMN IF NOT EXISTS recipient_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
+ALTER TABLE public.device_messages ADD COLUMN IF NOT EXISTS recipient_email TEXT NOT NULL DEFAULT '';
+ALTER TABLE public.device_messages ADD COLUMN IF NOT EXISTS conversation_key TEXT NOT NULL DEFAULT '';
+
 CREATE INDEX IF NOT EXISTS idx_device_messages_device_created 
 ON public.device_messages(device_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_device_messages_conversation 
+ON public.device_messages(conversation_key, created_at DESC);
 
 -- ==============================================================================
 -- AUTOMATIC 7-DAY HISTORY RETENTION & CLEANUP
@@ -423,25 +434,37 @@ CREATE POLICY "Authorized viewers can view device sync status"
 
 -- 10. DEVICE MESSAGES POLICIES
 DROP POLICY IF EXISTS "Authorized users can view messages for device" ON public.device_messages;
-CREATE POLICY "Authorized users can view messages for device"
+DROP POLICY IF EXISTS "Users can view conversation messages" ON public.device_messages;
+CREATE POLICY "Users can view conversation messages"
     ON public.device_messages FOR SELECT
     USING (
-        public.is_authorized_viewer(device_id)
+        (
+            auth.uid() = sender_id 
+            OR auth.uid() = recipient_id 
+            OR conversation_key LIKE '%' || auth.uid()::text || '%'
+            OR (device_id IS NOT NULL AND public.is_authorized_viewer(device_id))
+        )
         AND created_at >= (timezone('utc'::text, now()) - INTERVAL '24 hours')
     );
 
 DROP POLICY IF EXISTS "Authorized users can insert messages for device" ON public.device_messages;
-CREATE POLICY "Authorized users can insert messages for device"
+DROP POLICY IF EXISTS "Users can insert conversation messages" ON public.device_messages;
+CREATE POLICY "Users can insert conversation messages"
     ON public.device_messages FOR INSERT
     WITH CHECK (
-        auth.uid() = sender_id 
-        AND public.is_authorized_viewer(device_id)
+        auth.uid() = sender_id
     );
 
 DROP POLICY IF EXISTS "Authorized users can delete messages for device" ON public.device_messages;
-CREATE POLICY "Authorized users can delete messages for device"
+DROP POLICY IF EXISTS "Users can delete conversation messages" ON public.device_messages;
+CREATE POLICY "Users can delete conversation messages"
     ON public.device_messages FOR DELETE
-    USING (public.is_authorized_viewer(device_id));
+    USING (
+        auth.uid() = sender_id 
+        OR auth.uid() = recipient_id 
+        OR conversation_key LIKE '%' || auth.uid()::text || '%'
+        OR (device_id IS NOT NULL AND public.is_authorized_viewer(device_id))
+    );
 
 -- ==============================================================================
 -- ScreenTrack — Secure Multi-Device Pairing Workflow Stored Functions (RPC)

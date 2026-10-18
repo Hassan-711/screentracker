@@ -200,10 +200,13 @@ data class UserSession(
 @Serializable
 data class DeviceChatMessage(
     val id: String = "",
-    @SerialName("device_id") val deviceId: String,
-    @SerialName("sender_id") val senderId: String,
+    @SerialName("device_id") val deviceId: String? = null,
+    @SerialName("sender_id") val senderId: String = "",
     @SerialName("sender_email") val senderEmail: String = "",
     @SerialName("sender_role") val senderRole: String = "viewer", // "owner" or "viewer"
+    @SerialName("recipient_id") val recipientId: String? = null,
+    @SerialName("recipient_email") val recipientEmail: String? = null,
+    @SerialName("conversation_key") val conversationKey: String = "",
     @SerialName("message_text") val messageText: String,
     @SerialName("created_at") val createdAt: String = ""
 ) {
@@ -233,4 +236,12 @@ data class DeviceChatMessage(
                 false
             }
         }
+
+    companion object {
+        fun computeConversationKey(userA: String, userB: String): String {
+            val a = userA.trim().lowercase()
+            val b = userB.trim().lowercase()
+            return if (a <= b) "${a}_${b}" else "${b}_${a}"
+        }
+    }
 }

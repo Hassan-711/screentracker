@@ -68,7 +68,6 @@ import com.screentrack.app.data.model.DailyAnalyticsPoint
 import com.screentrack.app.data.model.RemoteDeviceLiveState
 import com.screentrack.app.data.model.SharingRequest
 import com.screentrack.app.data.repository.SupabaseRepository
-import com.screentrack.app.ui.components.DeviceChatSheet
 import com.screentrack.app.ui.theme.AccentAmber
 import com.screentrack.app.ui.theme.AccentEmerald
 import com.screentrack.app.ui.theme.AccentRose
@@ -80,7 +79,8 @@ import java.util.Locale
 @Composable
 fun RemoteMonitorScreen(
     onNavigateToAuth: () -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToChat: (deviceId: String, partnerId: String, partnerEmail: String, title: String) -> Unit = { _, _, _, _ -> }
 ) {
     val context = LocalContext.current
     val supabaseRepo = remember { SupabaseRepository(context) }
@@ -103,7 +103,6 @@ fun RemoteMonitorScreen(
 
     var deviceToRemove by remember { mutableStateOf<com.screentrack.app.data.model.RegisteredDevice?>(null) }
     var isRemovingDevice by remember { mutableStateOf(false) }
-    var chatTargetDevice by remember { mutableStateOf<com.screentrack.app.data.model.RegisteredDevice?>(null) }
 
     suspend fun loadRemoteData(showSpinner: Boolean = false) {
         if (!supabaseRepo.isConfigured || supabaseRepo.getCurrentSession() == null) {
@@ -525,7 +524,9 @@ fun RemoteMonitorScreen(
                                     }
 
                                     IconButton(
-                                        onClick = { chatTargetDevice = dev },
+                                        onClick = {
+                                            onNavigateToChat(dev.id, dev.ownerId, "", dev.deviceName)
+                                        },
                                         modifier = Modifier.size(36.dp)
                                     ) {
                                         Icon(
@@ -951,12 +952,4 @@ fun RemoteMonitorScreen(
         )
     }
 
-    if (chatTargetDevice != null) {
-        DeviceChatSheet(
-            deviceId = chatTargetDevice!!.id,
-            deviceOrViewerName = chatTargetDevice!!.deviceName,
-            isOwner = false,
-            onDismiss = { chatTargetDevice = null }
-        )
-    }
 }

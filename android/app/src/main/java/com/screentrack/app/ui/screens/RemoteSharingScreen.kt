@@ -64,7 +64,6 @@ import com.screentrack.app.data.model.AuthorizedViewer
 import com.screentrack.app.data.model.PairingCodeResult
 import com.screentrack.app.data.model.SharingRequest
 import com.screentrack.app.data.repository.SupabaseRepository
-import com.screentrack.app.ui.components.DeviceChatSheet
 import com.screentrack.app.ui.theme.AccentEmerald
 import com.screentrack.app.ui.theme.AccentRose
 import kotlinx.coroutines.delay
@@ -73,7 +72,8 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun RemoteSharingScreen(
-    onNavigateToAuth: () -> Unit = {}
+    onNavigateToAuth: () -> Unit = {},
+    onNavigateToChat: (deviceId: String, partnerId: String, partnerEmail: String, title: String) -> Unit = { _, _, _, _ -> }
 ) {
     val context = LocalContext.current
     val supabaseRepo = remember { SupabaseRepository(context) }
@@ -92,8 +92,6 @@ fun RemoteSharingScreen(
     var authorizedViewers by remember { mutableStateOf<List<AuthorizedViewer>>(emptyList()) }
     var isLoadingLists by remember { mutableStateOf(true) }
 
-    var viewerToRevoke by remember { mutableStateOf<AuthorizedViewer?>(null) }
-    var activeChatTarget by remember { mutableStateOf<Pair<String, String>?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     suspend fun refreshLists(showSpinner: Boolean = false) {
@@ -543,7 +541,12 @@ fun RemoteSharingScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Button(
                                 onClick = {
-                                    activeChatTarget = Pair(viewer.deviceId, viewer.viewerEmail)
+                                    onNavigateToChat(
+                                        viewer.deviceId,
+                                        viewer.viewerId,
+                                        viewer.viewerEmail,
+                                        viewer.viewerEmail
+                                    )
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                                 shape = RoundedCornerShape(8.dp)
@@ -551,16 +554,6 @@ fun RemoteSharingScreen(
                                 Icon(Icons.Default.Forum, contentDescription = "Chat", modifier = Modifier.size(14.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text("Chat", fontSize = 12.sp)
-                            }
-
-                            Spacer(modifier = Modifier.width(6.dp))
-
-                            OutlinedButton(
-                                onClick = { viewerToRevoke = viewer },
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentRose),
-                                shape = RoundedCornerShape(8.dp)
-                            ) {
-                                Text("Revoke", fontSize = 12.sp)
                             }
                         }
                     }
@@ -612,48 +605,6 @@ fun RemoteSharingScreen(
                     Text("Cancel")
                 }
             }
-        )
-    }
-
-    // Revocation Confirmation Dialog
-    if (viewerToRevoke != null) {
-        AlertDialog(
-            onDismissRequest = { viewerToRevoke = null },
-            title = { Text("Revoke Remote Access?") },
-            text = {
-                Text("Remove access for ${viewerToRevoke?.viewerEmail}? They will immediately stop seeing this phone's screen time.")
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val v = viewerToRevoke
-                        viewerToRevoke = null
-                        if (v != null) {
-                            scope.launch {
-                                supabaseRepo.revokeViewer(v.viewerId)
-                                refreshLists(showSpinner = false)
-                            }
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = AccentRose)
-                ) {
-                    Text("Revoke Access")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { viewerToRevoke = null }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
-
-    if (activeChatTarget != null) {
-        DeviceChatSheet(
-            deviceId = activeChatTarget!!.first,
-            deviceOrViewerName = activeChatTarget!!.second,
-            isOwner = true,
-            onDismiss = { activeChatTarget = null }
         )
     }
 }
